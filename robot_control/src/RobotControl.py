@@ -87,10 +87,10 @@ class RobotControl(object):
 
         # TODO for student: Use this when transferring code to robot
         meas = self.ros_interface.get_measurements()
-        imu_meas = self.ros_interface.get_imu()
+        # imu_meas = self.ros_interface.get_imu() #unused for tag chasing
 
         # meas is the position of the robot with respect to the AprilTags
-        print(meas)
+        # print(meas)
 
         # if there is a april tag in view
         if meas is not None:
@@ -100,7 +100,7 @@ class RobotControl(object):
                 # found something, log the time
                 self.last_detect_time = rospy.get_time()
                 # set the goal to the position of the robot with respect to the AprilTag
-                goal = np.array([[meas[0][0]],[meas[0][1]]])
+                goal = np.array([[meas[0][0]], [-1*meas[0][1]]])
                 # set the current robots position to the origin
                 state = np.array([0,0,0])
                 target_velocity = self.diff_drive_controller.compute_vel(state, goal)
@@ -109,14 +109,20 @@ class RobotControl(object):
                 self.omega = target_velocity[1]
                 # if done, stop
                 if target_velocity[2]:
+                    # print('SOOOO CLOSE: STOP')
+
                     self.v = 0
                     self.omega = 0
         else: # if we're not seeing anything check if its been awhile then zero out commands
             if (rospy.get_time() - self.last_detect_time) > self.missed_vision_debounce:
                 self.v = 0
                 self.omega = 0
+                # print('TIMEOUT: STOP')
 
+        # print(self.v)
+        # print(self.omega)
         self.ros_interface.command_velocity(self.v,self.omega)
+        
 
         return
     
@@ -157,7 +163,7 @@ def main(args):
 
     # TODO for student: Use this to run the interface on the robot
     # Call process_measurements at 60Hz
-    r = rospy.Rate(60)
+    r = rospy.Rate(15) # was 60Hz orginial
     while not rospy.is_shutdown():
         robotControl.process_measurements()
         r.sleep()
