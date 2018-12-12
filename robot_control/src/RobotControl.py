@@ -3,7 +3,8 @@
 ROS based interface for the Course Robotics Specialization Capstone Autonomous Rover.
 Updated June 19 2016.
 """
-import rospy
+# TODO for robot control only
+# import rospy
 
 import yaml
 import numpy as np
@@ -11,15 +12,15 @@ import numpy as np
 import sys
 
 # TODO for student: Comment this section when running on the robot 
-# from RobotSim import RobotSim
-# import matplotlib.pyplot as plt
+from RobotSim import RobotSim
+import matplotlib.pyplot as plt
 
 # TODO for student: uncomment when changing to the robot
-from RosInterface import ROSInterface
+# from RosInterface import ROSInterface
 
 # TODO for student: User files, uncomment as completed
 #from MyShortestPath import dijkstras
-#from KalmanFilter import KalmanFilter
+from KalmanFilter import KalmanFilter
 from DiffDriveController import DiffDriveController
 
 class RobotControl(object):
@@ -57,22 +58,22 @@ class RobotControl(object):
         """
 
         # TODO for student: Comment this when running on the robot 
-        # self.robot_sim = RobotSim(world_map, occupancy_map, pos_init, pos_goal,
-        #                          max_speed, max_omega, x_spacing, y_spacing)
+        self.robot_sim = RobotSim(world_map, occupancy_map, pos_init, pos_goal,
+                                  max_speed, max_omega, x_spacing, y_spacing)
         # TODO for student: Use this when transferring code to robot
         # Handles all the ROS related items
-        self.ros_interface = ROSInterface(t_cam_to_body)
+        # self.ros_interface = ROSInterface(t_cam_to_body)
 
         # YOUR CODE AFTER THIS
         
         # speed control variables
-        self.v = 0 # allows persistent cmds through detection misses
-        self.omega = 0 # allows persistent cmds through detection misses
-        self.last_detect_time = rospy.get_time()
+        self.v = 0.1 # allows persistent cmds through detection misses
+        self.omega = -0.1 # allows persistent cmds through detection misses
+        # self.last_detect_time = rospy.get_time() #TODO on bot only
         self.missed_vision_debounce = 1
 
         # Uncomment as completed
-        #self.kalman_filter = KalmanFilter(world_map)
+        self.kalman_filter = KalmanFilter(world_map)
         self.diff_drive_controller = DiffDriveController(max_speed, max_omega)
 
     def process_measurements(self):
@@ -82,17 +83,21 @@ class RobotControl(object):
         are done. This function is called at 60Hz
         """
         # TODO for student: Comment this when running on the robot 
-        # meas = self.robot_sim.get_measurements()
-        # imu_meas = self.robot_sim.get_imu()
+        meas = self.robot_sim.get_measurements()
+        imu_meas = self.robot_sim.get_imu()
 
         # TODO for student: Use this when transferring code to robot
-        meas = self.ros_interface.get_measurements()
-        # imu_meas = self.ros_interface.get_imu() #unused for tag chasing
+        # meas = self.ros_interface.get_measurements()
+        # imu_meas = self.ros_interface.get_imu()
 
         # meas is the position of the robot with respect to the AprilTags
         # print(meas)
 
-        # if there is a april tag in view
+        # now that we have the measurements, update the predicted state
+        self.kalman_filter.step_filter(self.v, imu_meas, meas)
+
+        ''' AprilTag Chasing Code
+        # if there is an AprilTag in view
         if meas is not None:
             # if the ID is 0, chase it
             cur_id = meas[0][3]
@@ -122,15 +127,23 @@ class RobotControl(object):
         # print(self.v)
         # print(self.omega)
         self.ros_interface.command_velocity(self.v,self.omega)
+        '''
+
+        #print(self.kalman_filter.x_t)
+        self.robot_sim.set_est_state(self.kalman_filter.x_t)
+        #self.robot_sim.set_est_state(np.array([[0.5],[1],[0]]))
         
+        # for Kalman filter just derp around
+        #self.ros_interface.command_velocity(0.1,-0.01) # forward with a slow right
+        self.robot_sim.command_velocity(self.v,self.omega)
 
         return
     
 def main(args):
-    rospy.init_node('robot_control') # TODO for running on bot
-    param_path = rospy.get_param("~param_path") # TODO for running on bot
     # Load parameters from yaml
-    #param_path = 'params.yaml' # TODO for running on sim 
+    # rospy.init_node('robot_control') # TODO for running on bot
+    # param_path = rospy.get_param("~param_path") # TODO for running on bot
+    param_path = 'params.yaml' # TODO for running on sim 
     f = open(param_path,'r')
     params_raw = f.read()
     f.close()
@@ -152,24 +165,23 @@ def main(args):
 
     # TODO for student: Comment this when running on the robot 
     # Run the simulation
-    """
     while not robotControl.robot_sim.done and plt.get_fignums():
         robotControl.process_measurements()
         robotControl.robot_sim.update_frame()
 
     plt.ioff()
     plt.show()
-    """
 
     # TODO for student: Use this to run the interface on the robot
     # Call process_measurements at 60Hz
+    '''
     r = rospy.Rate(15) # was 60Hz orginial
     while not rospy.is_shutdown():
         robotControl.process_measurements()
         r.sleep()
     # Done, stop robot
     robotControl.ros_interface.command_velocity(0,0)
-
+    '''
 if __name__ == "__main__":
     main(sys.argv)
 
