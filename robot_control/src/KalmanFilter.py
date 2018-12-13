@@ -121,8 +121,12 @@ class KalmanFilter:
             tag_phi_r = cur_tag_meas[2]
             tag_id = cur_tag_meas[3]
 
-            print('tag measurement')
-            print(cur_tag_meas)
+            H_tag_r = np.array([[math.cos(tag_phi_r),-1*math.sin(tag_phi_r),tag_x_r],
+                [math.sin(tag_phi_r),math.cos(tag_phi_r),tag_y_r],
+                [0,0,1]])
+
+            #print('tag measurement')
+            #print(cur_tag_meas)
 
             # get the current tags logged position in the world frame
             for search_idx in range(0, num_markers):
@@ -130,18 +134,23 @@ class KalmanFilter:
                     tag_x_w = self.markers[search_idx][0]
                     tag_y_w = self.markers[search_idx][1]
                     tag_phi_w = self.markers[search_idx][2]
-                    print('tag from map')
-                    print(self.markers[search_idx])
+                    #print('tag from map')
+                    #print(self.markers[search_idx])
                     break                    
 
-            # generate the predicted rover position (z_cur)
-            rob_phi_w = tag_phi_w - tag_phi_r            
-            rob_x_w = tag_x_w - tag_x_r
-            rob_y_w = tag_y_w - tag_y_r
-            z_cur = np.array([[rob_x_w],[rob_y_w],[rob_phi_w]])
+            H_tag_w = np.array([[math.cos(tag_phi_w),-1*math.sin(tag_phi_w),tag_x_w],
+                [math.sin(tag_phi_w),math.cos(tag_phi_w),tag_y_w],
+                [0,0,1]])
 
-            print('predicted pose:')
-            print(z_cur)
+            # generate the predicted rover position (z_cur)
+            H_bot_w = np.matmul(H_tag_w,np.linalg.inv(H_tag_r))
+
+            z_cur = np.array([[H_bot_w[0][2]],
+                [H_bot_w[1][2]],
+                [math.atan2(H_bot_w[1][0],H_bot_w[0][0])]])
+
+            #print('predicted pose:')
+            #print(z_cur)
 
             # generate the Kalman gain for this measurement
             K = np.matmul(self.P_t,np.linalg.inv(np.add(self.P_t,self.R_t)))
