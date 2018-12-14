@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 # from RosInterface import ROSInterface
 
 # TODO for student: User files, uncomment as completed
-#from MyShortestPath import dijkstras
+from ShortestPath import dijkstras
 from KalmanFilter import KalmanFilter
 from DiffDriveController import DiffDriveController
 
@@ -72,6 +72,9 @@ class RobotControl(object):
         # self.last_detect_time = rospy.get_time() #TODO on bot only
         self.missed_vision_debounce = 1
 
+        # generate the path assuming we know our start location, goal, and environment
+        #self.path = dijkstras(occupancy_map,x_spacing,y_spacing,pos_init,pos_goal)
+
         # Uncomment as completed
         self.kalman_filter = KalmanFilter(world_map)
         self.diff_drive_controller = DiffDriveController(max_speed, max_omega)
@@ -82,6 +85,7 @@ class RobotControl(object):
         Main loop of the robot - where all measurements, control, and esimtaiton
         are done. This function is called at 60Hz
         """
+
         # TODO for student: Comment this when running on the robot 
         meas = self.robot_sim.get_measurements()
         imu_meas = self.robot_sim.get_imu()
