@@ -8,13 +8,13 @@ class DiffDriveController():
     Class used for controlling the robot linear and angular velocity
     """
     def __init__(self, max_speed, max_omega):
-        self.kp=0.2 #m/s / m must be > 0
-        self.ka=3 #rad/s / rad must be > kp
+        self.kp=0.5 #m/s / m must be > 0
+        self.ka=2 #rad/s / rad must be > kp
         self.kb=0
         #self.MAX_SPEED = max_speed
         self.MAX_SPEED = 0.15 # slower is more contrallable
         self.MAX_OMEGA = max_omega
-        self.done_distance = 0.2 # m
+        self.done_distance = 0.15 # m
         
     def compute_vel(self, state, goal):
         """
@@ -44,13 +44,13 @@ class DiffDriveController():
         b = error between current heading to goal and target end heading
         """
         
-        print('state,goal,v,w')
-        print(state)
-        print(goal)
+        #print('state,goal,v,w')
+        #print(state)
+        #print(goal)
 
-        xr = state[0] # m in world frame
-        yr = state[1] # m in world frame
-        thetar = state[2] #rads
+        xr = state[0][0] # m in world frame
+        yr = state[1][0] # m in world frame
+        thetar = state[2][0] #rads
 
         xg = goal[0] # m in world frame
         yg = goal[1] # m in world frame
@@ -80,13 +80,8 @@ class DiffDriveController():
         # set the done value
         done = (p <= self.done_distance)
 
-        # zero out commands when done
-        if done:
-            v = 0
-            omega = 0
-
-        print(v)
-        print(omega)
+        #print(v)
+        #print(omega)
 
         out_tuple = (v, omega, done)
        

@@ -73,7 +73,9 @@ class RobotControl(object):
         self.missed_vision_debounce = 1
 
         # generate the path assuming we know our start location, goal, and environment
-        #self.path = dijkstras(occupancy_map,x_spacing,y_spacing,pos_init,pos_goal)
+        self.path = dijkstras(occupancy_map,x_spacing,y_spacing,pos_init,pos_goal)
+        self.path_idx = 0
+        self.mission_complete = False
 
         # Uncomment as completed
         self.kalman_filter = KalmanFilter(world_map)
@@ -85,6 +87,8 @@ class RobotControl(object):
         Main loop of the robot - where all measurements, control, and esimtaiton
         are done. This function is called at 60Hz
         """
+
+        #print(' ')
 
         # TODO for student: Comment this when running on the robot 
         meas = self.robot_sim.get_measurements()
@@ -99,50 +103,34 @@ class RobotControl(object):
 
         # now that we have the measurements, update the predicted state
         self.kalman_filter.step_filter(self.v, imu_meas, meas)
-
-        ''' AprilTag Chasing Code
-        # if there is an AprilTag in view
-        if meas is not None:
-            # if the ID is 0, chase it
-            cur_id = meas[0][3]
-            if cur_id == 0:
-                # found something, log the time
-                self.last_detect_time = rospy.get_time()
-                # set the goal to the position of the robot with respect to the AprilTag
-                goal = np.array([[meas[0][0]], [-1*meas[0][1]]])
-                # set the current robots position to the origin
-                state = np.array([0,0,0])
-                target_velocity = self.diff_drive_controller.compute_vel(state, goal)
-                # set the commanded velocity to the target
-                self.v = target_velocity[0]
-                self.omega = target_velocity[1]
-                # if done, stop
-                if target_velocity[2]:
-                    # print('SOOOO CLOSE: STOP')
-
-                    self.v = 0
-                    self.omega = 0
-        else: # if we're not seeing anything check if its been awhile then zero out commands
-            if (rospy.get_time() - self.last_detect_time) > self.missed_vision_debounce:
-                self.v = 0
-                self.omega = 0
-                # print('TIMEOUT: STOP')
-
-        # print(self.v)
-        # print(self.omega)
-        self.ros_interface.command_velocity(self.v,self.omega)
-        '''
-
-        #print(self.kalman_filter.x_t)
+        # TODO remove on bot, shows predicted state on simulator
         self.robot_sim.set_est_state(self.kalman_filter.x_t)
-        #self.robot_sim.set_est_state(np.array([[0.5],[1],[0]]))
-        
-        # for Kalman filter just derp around
-        #self.ros_interface.command_velocity(0.1,-0.01) # forward with a slow right
-        self.robot_sim.command_velocity(self.v,self.omega)
 
+        # pull the next path point from the list
+        cur_goal = self.path[self.path_idx]
+
+        # calculate the control commands need to reach next path point
+        #print(cur_goal)
+        #print(self.kalman_filter.x_t)
+        control_cmd = self.diff_drive_controller.compute_vel(self.kalman_filter.x_t,cur_goal);
+
+        #print('control command:')
+        #print(control_cmd)
+
+        if self.mission_complete:
+            self.robot_sim.command_velocity(0,0)
+        else:
+            self.robot_sim.command_velocity(control_cmd[0],control_cmd[1])
+
+        #print(control_cmd)
+        if control_cmd[2]:
+            if len(self.path) > (self.path_idx + 1):
+                self.path_idx = self.path_idx + 1
+                print('bump')
+            else:
+                self.mission_complete = True
         return
-    
+
 def main(args):
     # Load parameters from yaml
     # rospy.init_node('robot_control') # TODO for running on bot
