@@ -24,7 +24,7 @@ class KalmanFilter:
             moment
         """
         self.markers = markers
-        # self.last_time = rospy.get_time() # TODO for on bot Used to keep track of time between measurements 
+        self.last_time = rospy.get_time() # TODO for on bot Used to keep track of time between measurements 
 
         # control covarience (1,1) is variance of v from commanded: deviation of 0.03 m/s
         # (2,2) is varience of w from gyro measurement: deviation of 0.1 rad/s
@@ -59,11 +59,11 @@ class KalmanFilter:
 
         # update the estimated state
         # TODO for robot only        
-        # cur_time = rospy.get_time()
-        # dt = cur_time - self.last_time
+        cur_time = rospy.get_time()
+        dt = cur_time - self.last_time
 
         # TODO dt on robot simulator
-        dt = 0.05;
+        #dt = 0.05;
 
         dx = dt*np.array([[v*math.cos(self.x_t[2])],
             [v*math.sin(self.x_t[2])],
@@ -83,7 +83,7 @@ class KalmanFilter:
         self.P_t = np.add(front,back) 
 
         # store time for next prediction TODO for on bot
-        # self.last_time = cur_time
+        self.last_time = cur_time
 
 
     def update(self,z_t):
