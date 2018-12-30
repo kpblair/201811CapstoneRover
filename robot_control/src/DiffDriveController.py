@@ -57,15 +57,23 @@ class DiffDriveController():
 
         dy = yg - yr
         dx = xg - xr
+
+        #print('')
+        #print(state)
+        #print(goal)
         
         # Calculate a
         a = -1*thetar + math.atan2(dy,dx)
 
-        while a > 2*math.pi:
-            a = a - math.pi
+        #print(a)
 
-        while a < -2*math.pi:
-            a = a + math.pi
+        if a > math.pi:
+            a = a - 2*math.pi
+
+        if a < -1*math.pi:
+            a = a + 2*math.pi
+
+        #print(a)
 
         # Set omega according to control law
         omega = self.ka*a

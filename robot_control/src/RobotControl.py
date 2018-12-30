@@ -4,7 +4,7 @@ ROS based interface for the Course Robotics Specialization Capstone Autonomous R
 Updated June 19 2016.
 """
 # TODO for robot control only
-import rospy
+# import rospy
 
 import yaml
 import numpy as np
@@ -12,11 +12,11 @@ import numpy as np
 import sys
 
 # TODO for student: Comment this section when running on the robot 
-# from RobotSim import RobotSim
-# import matplotlib.pyplot as plt
+from RobotSim import RobotSim
+import matplotlib.pyplot as plt
 
 # TODO for student: uncomment when changing to the robot
-from RosInterface import ROSInterface
+# from RosInterface import ROSInterface
 
 # TODO for student: User files, uncomment as completed
 from ShortestPath import dijkstras
@@ -58,26 +58,27 @@ class RobotControl(object):
         """
 
         # TODO for student: Comment this when running on the robot 
-        # self.robot_sim = RobotSim(world_map, occupancy_map, pos_init, pos_goal,
-        #                          max_speed, max_omega, x_spacing, y_spacing)
+        self.robot_sim = RobotSim(world_map, occupancy_map, pos_init, pos_goal, 
+		                            max_speed, max_omega, x_spacing, y_spacing)
         # TODO for student: Use this when transferring code to robot
         # Handles all the ROS related items
-        self.ros_interface = ROSInterface(t_cam_to_body)
+        # self.ros_interface = ROSInterface(t_cam_to_body)
 
         # YOUR CODE AFTER THIS
         
         # speed control variables
         self.v = 0.1 # allows persistent cmds through detection misses
         self.omega = -0.1 # allows persistent cmds through detection misses
-        self.last_detect_time = rospy.get_time() #TODO on bot only
+        # self.last_detect_time = rospy.get_time() #TODO on bot only
         self.missed_vision_debounce = 1
 
         self.start_time = 0
 
         # generate the path assuming we know our start location, goal, and environment
         self.path = dijkstras(occupancy_map,x_spacing,y_spacing,pos_init,pos_goal)
-        self.path_idx = 2
+        self.path_idx = 0
         self.mission_complete = False
+        self.carrot_distance = 0.2
 
         # Uncomment as completed
         self.kalman_filter = KalmanFilter(world_map)
@@ -93,12 +94,12 @@ class RobotControl(object):
         #print(' ')
 
         # TODO for student: Comment this when running on the robot 
-        # meas = self.robot_sim.get_measurements()
-        # imu_meas = self.robot_sim.get_imu()
+        meas = self.robot_sim.get_measurements()
+        imu_meas = self.robot_sim.get_imu()
 
         # TODO for student: Use this when transferring code to robot
-        meas = self.ros_interface.get_measurements()
-        imu_meas = self.ros_interface.get_imu()
+        # meas = self.ros_interface.get_measurements()
+        # imu_meas = self.ros_interface.get_imu()
 
         # meas is the position of the robot with respect to the AprilTags
         # print(meas)
@@ -108,18 +109,18 @@ class RobotControl(object):
         # print(self.kalman_filter.x_t)
 
         # TODO remove on bot, shows predicted state on simulator
-        # self.robot_sim.set_est_state(self.kalman_filter.x_t)
+        self.robot_sim.set_est_state(self.kalman_filter.x_t)
 
         # pull the next path point from the list
-        # cur_goal = self.getCarrot()
+        cur_goal = self.getCarrot()
 
-        cur_goal = self.path[self.path_idx]
+        # cur_goal = self.path[self.path_idx]
         # TODO test to just go to a goal
         # cur_goal[0] = 0.43
         # cur_goal[1] = 2
 
         # calculate the control commands need to reach next path point
-        print('')
+        #print('')
         #print('current goal:')
         #print(cur_goal)
         #print('current state:')
@@ -157,8 +158,12 @@ class RobotControl(object):
             self.omega = 0
         '''
 
-        self.ros_interface.command_velocity(self.v,self.omega)
+        #TODO on bot only
+        # self.ros_interface.command_velocity(self.v,self.omega)
         
+        #TODO for simulation
+        self.robot_sim.command_velocity(self.v,self.omega)
+
         return
 
     def getCarrot(self):
@@ -172,12 +177,70 @@ class RobotControl(object):
         idx = self.path_idx
         pos = self.kalman_filter.x_t
 
+        # if the current line segment ends in the goal point, set that to the goal
+        if self.path_idx + 1 == len(self.path):
+            return self.path[(len(self.path) - 1)]
+        else:   
+            # find the point on the current line closest to the robot
+            # calculate current line's slope and intercept
+            pt1 = self.path[self.path_idx]
+            pt2 = self.path[self.path_idx + 1]
+            x_diff = pt2[0] - pt1[0]
+            y_diff = pt2[1] - pt1[1]
+            vert = abs(x_diff) < 0.001
+
+            # using the current line's slope and intercept find the point on that
+            # line closest to the robots current point
+            # assumes all lines are either veritcal or horizontal
+            x_bot = pos[0][0]
+            y_bot = pos[1][0]
+            if vert:
+                x_norm = pt2[0]
+                y_norm = y_bot
+            else:
+                x_norm = x_bot
+                y_norm = pt2[1]
+
+            # if the normal point is past the end point of this segment inc path idx
+            # assumes all lines are either vertical or horizontal
+            inc = False
+            if vert:
+                if (y_diff > 0 and y_norm > pt2[1]) or (y_diff < 0 and y_norm < pt2[1]):
+                    inc = True
+            else:
+                if (x_diff > 0 and x_norm > pt2[0]) or (x_diff < 0 and x_norm < pt2[0]):
+                    inc = True
+
+            if(inc):
+                self.path_idx = self.path_idx + 1
+                print('increment path index')
+
+            # find a point L distance infront of the normal point on this line
+            # assumes all lines are either vertical or horizontal
+            if vert:
+                x_goal = pt2[0]
+                if y_diff > 0:
+                    y_goal = y_bot + self.carrot_distance
+                else:
+                    y_goal = y_bot - self.carrot_distance
+            else:
+                y_goal = pt2[1]
+                if x_diff > 0:
+                    x_goal = x_bot + self.carrot_distance
+                else:
+                    x_goal = x_bot - self.carrot_distance
+
+            goal = np.array([x_goal, y_goal])
+
+            #print(goal)
+
+            return goal
 
 def main(args):
     # Load parameters from yaml
-    rospy.init_node('robot_control') # TODO for running on bot
-    param_path = rospy.get_param("~param_path") # TODO for running on bot
-    #param_path = 'params.yaml' # TODO for running on sim 
+    # rospy.init_node('robot_control') # TODO for running on bot
+    # param_path = rospy.get_param("~param_path") # TODO for running on bot
+    param_path = 'params.yaml' # TODO for running on sim 
     f = open(param_path,'r')
     params_raw = f.read()
     f.close()
@@ -199,23 +262,23 @@ def main(args):
 
     # TODO for student: Comment this when running on the robot 
     # Run the simulation
-    '''
     while not robotControl.robot_sim.done and plt.get_fignums():
         robotControl.process_measurements()
         robotControl.robot_sim.update_frame()
 
     plt.ioff()
     plt.show()
-    '''
 
     # TODO for student: Use this to run the interface on the robot
     # Call process_measurements at 60Hz
+    '''    
     r = rospy.Rate(15) # was 60Hz orginial
     while not rospy.is_shutdown():
         robotControl.process_measurements()
         r.sleep()
     # Done, stop robot
     robotControl.ros_interface.command_velocity(0,0)
+    '''
 
 if __name__ == "__main__":
     main(sys.argv)
