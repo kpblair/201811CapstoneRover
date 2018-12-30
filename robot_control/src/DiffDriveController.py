@@ -8,13 +8,13 @@ class DiffDriveController():
     Class used for controlling the robot linear and angular velocity
     """
     def __init__(self, max_speed, max_omega):
-        self.kp=0.5 #m/s / m must be > 0
+        self.kp=0.8 #m/s / m must be > 0 old 0.5
         self.ka=2 #rad/s / rad must be > kp
         self.kb=0
         #self.MAX_SPEED = max_speed
         self.MAX_SPEED = 0.15 # slower is more contrallable
         self.MAX_OMEGA = max_omega
-        self.done_distance = 0.15 # m
+        self.done_distance = 0.17 #old 0.15
         
     def compute_vel(self, state, goal):
         """
@@ -60,7 +60,13 @@ class DiffDriveController():
         
         # Calculate a
         a = -1*thetar + math.atan2(dy,dx)
-        
+
+        while a > 2*math.pi:
+            a = a - math.pi
+
+        while a < -2*math.pi:
+            a = a + math.pi
+
         # Set omega according to control law
         omega = self.ka*a
         if math.fabs(omega) > self.MAX_OMEGA:

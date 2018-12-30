@@ -58,23 +58,25 @@ class RobotControl(object):
         """
 
         # TODO for student: Comment this when running on the robot 
-        self.robot_sim = RobotSim(world_map, occupancy_map, pos_init, pos_goal,
-                                  max_speed, max_omega, x_spacing, y_spacing)
+        # self.robot_sim = RobotSim(world_map, occupancy_map, pos_init, pos_goal,
+        #                          max_speed, max_omega, x_spacing, y_spacing)
         # TODO for student: Use this when transferring code to robot
         # Handles all the ROS related items
-        # self.ros_interface = ROSInterface(t_cam_to_body)
+        self.ros_interface = ROSInterface(t_cam_to_body)
 
         # YOUR CODE AFTER THIS
         
         # speed control variables
         self.v = 0.1 # allows persistent cmds through detection misses
         self.omega = -0.1 # allows persistent cmds through detection misses
-        # self.last_detect_time = rospy.get_time() #TODO on bot only
+        self.last_detect_time = rospy.get_time() #TODO on bot only
         self.missed_vision_debounce = 1
+
+        self.start_time = 0
 
         # generate the path assuming we know our start location, goal, and environment
         self.path = dijkstras(occupancy_map,x_spacing,y_spacing,pos_init,pos_goal)
-        self.path_idx = 0
+        self.path_idx = 2
         self.mission_complete = False
 
         # Uncomment as completed
@@ -103,21 +105,32 @@ class RobotControl(object):
 
         # now that we have the measurements, update the predicted state
         self.kalman_filter.step_filter(self.v, imu_meas, meas)
+        # print(self.kalman_filter.x_t)
+
         # TODO remove on bot, shows predicted state on simulator
         # self.robot_sim.set_est_state(self.kalman_filter.x_t)
 
         # pull the next path point from the list
+        # cur_goal = self.getCarrot()
+
         cur_goal = self.path[self.path_idx]
+        # TODO test to just go to a goal
+        # cur_goal[0] = 0.43
+        # cur_goal[1] = 2
 
         # calculate the control commands need to reach next path point
+        print('')
+        #print('current goal:')
         #print(cur_goal)
+        #print('current state:')
         #print(self.kalman_filter.x_t)
+
         control_cmd = self.diff_drive_controller.compute_vel(self.kalman_filter.x_t,cur_goal);
         self.v = control_cmd[0]
         self.omega = control_cmd[1]
 
         #print('control command:')
-        #print(control_cmd)
+       # print(control_cmd)
 
         if self.mission_complete:
             self.v = 0
@@ -127,10 +140,38 @@ class RobotControl(object):
         if control_cmd[2]:
             if len(self.path) > (self.path_idx + 1):
                 self.path_idx = self.path_idx + 1
-                print('bump')
+                print('next goal')
             else:
                 self.mission_complete = True
+        
+        #TODO calibration test on bot only for linear velocity
+        '''
+        if self.start_time - 0 < 0.0001:
+            self.start_time = rospy.get_time()
+
+        if(rospy.get_time() - self.start_time > 4):
+            self.v = 0
+            self.omega = 0
+        else:
+            self.v = 0.15
+            self.omega = 0
+        '''
+
+        self.ros_interface.command_velocity(self.v,self.omega)
+        
         return
+
+    def getCarrot(self):
+        '''
+        getCarrot - generates an artificial goal location along a path out 
+        infront of the robot.
+        path - the set of points which make up the waypoints in the path
+        position - the current position of the robot
+        '''
+        path = self.path
+        idx = self.path_idx
+        pos = self.kalman_filter.x_t
+
 
 def main(args):
     # Load parameters from yaml
