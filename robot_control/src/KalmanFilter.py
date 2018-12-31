@@ -6,7 +6,7 @@ from matplotlib import patches
 #import pylab
 import time
 import math
-# import rospy #TODO for use on robot
+import rospy #TODO for use on robot
 
 class KalmanFilter:
     """
@@ -25,17 +25,18 @@ class KalmanFilter:
             moment
         """
         self.markers = markers
-        # self.last_time = rospy.get_time() # TODO for on bot Used to keep track of time between measurements 
+        self.last_time = rospy.get_time() # TODO for on bot Used to keep track of time between measurements 
 
         # control covarience (1,1) is variance of v from commanded: deviation of 0.03 m/s
         # (2,2) is varience of w from gyro measurement: deviation of 0.1 rad/s
-        # self.Q_t = np.array([[0.0009,0],[0,0.01]]) # original guesses
-        self.Q_t = np.array([[1000000,0],[0,1000000]]) # increase so AprilTag measurements are highly trusted
+        self.Q_t = np.array([[0.0009,0],[0,0.01]]) # original guesses
+        # self.Q_t = np.array([[1000000,0],[0,1000000]]) # increase so AprilTag measurements are highly trusted
 													
         # covarience about the AprilTag measurements backpropegated location
         # 2cm for x,y -> 0.0004    
         # 2*pi/20 (0.3) rad for phi -> 0.09
-        self.R_t = np.array([[0.0004,0,0],[0,0.0004,0],[0,0,0.09]]) 
+        # self.R_t = np.array([[0.0004,0,0],[0,0.0004,0],[0,0,0.09]])
+        self.R_t = np.array([[0.00004,0,0],[0,0.00004,0],[0,0,0.0009]]) #used for close tags
 
         self.x_t = np.array([[0.5],[0.5],[1.5]]) # initilize state to the origin
         self.P_t = np.array([[1,0,0],[0,1,0],[0,0,9]]) # initialize all variences very high
@@ -58,17 +59,17 @@ class KalmanFilter:
         """
         
         w = imu_meas[3][0] # get the rotational velocity from the gyro measurement
-        # w = -1*w # TODO for robot only
+        w = -1*w # TODO for robot only
         #print(w)
         #print(v)
 
         # update the estimated state
         # TODO for robot only        
-        #cur_time = rospy.get_time()
-        #dt = cur_time - self.last_time
+        cur_time = rospy.get_time()
+        dt = cur_time - self.last_time
 
         # TODO dt on robot simulator
-        dt = 0.05;
+        #dt = 0.05;
 
         dx = dt*np.array([[v*math.cos(self.x_t[2])],
             [v*math.sin(self.x_t[2])],
@@ -88,7 +89,7 @@ class KalmanFilter:
         self.P_t = np.add(front,back) 
 
         # store time for next prediction TODO for on bot
-        # self.last_time = cur_time
+        self.last_time = cur_time
 
 
     def update(self,z_t):
@@ -126,18 +127,22 @@ class KalmanFilter:
             tag_phi_r = cur_tag_meas[2]
             tag_id = cur_tag_meas[3]
 
-            #print('tag data (x,y,phi,id):')
-            #print(tag_x_r)
-            #print(tag_y_r)
-            #print(tag_phi_r) 
-            #print(tag_id)
+            # if the tag is far away boost the varience to a very big number
+            if tag_x_r > 1: # tag more than a meter away, don't trust it
+                self.R_t = np.array([[100,0,0],[0,100,0],[0,0,6]])
+
+            print('tag data (x,y,phi,id):')
+            print(tag_x_r)
+            print(tag_y_r)
+            print(tag_phi_r) 
+            print(tag_id)
 
             H_tag_r = np.array([[math.cos(tag_phi_r),-1*math.sin(tag_phi_r),tag_x_r],
                 [math.sin(tag_phi_r),math.cos(tag_phi_r),tag_y_r],
                 [0,0,1]])
 
-            #print('tag measurement')
-            #print(cur_tag_meas)
+            print('tag measurement')
+            print(cur_tag_meas)
 
             # get the current tags logged position in the world frame
             for search_idx in range(0, num_markers):
@@ -160,8 +165,8 @@ class KalmanFilter:
                 [H_bot_w[1][2]],
                 [math.atan2(H_bot_w[1][0],H_bot_w[0][0])]])
 
-            #print('predicted pose:')
-            #print(z_cur)
+            print('predicted pose:')
+            print(z_cur)
 
             # generate the Kalman gain for this measurement
             K = np.matmul(self.P_t,np.linalg.inv(np.add(self.P_t,self.R_t)))
